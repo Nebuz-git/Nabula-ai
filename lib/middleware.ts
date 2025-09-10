@@ -1,9 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-
-// a layer in between routes that we can accept or rejects
-
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -30,45 +27,36 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // Do not run code between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
+  // Check if user is authenticated
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  // IMPORTANT: DO NOT REMOVE auth.getUser()
+  // Define protected and public routes
+  const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard')
+  const isSignInRoute = request.nextUrl.pathname === '/signin'
+  const isLandingPage = request.nextUrl.pathname === '/'
 
-  // if(request.nextUrl.pathname === "/") {
-  //   const url = request.nextUrl.clone();
+  // If user is authenticated and trying to access signin page, redirect to dashboard
+  if (user && isSignInRoute) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
+    return NextResponse.redirect(url)
+  }
+
+  // If user is not authenticated and trying to access protected routes, redirect to signin
+  if (!user && isProtectedRoute) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/signin'
+    return NextResponse.redirect(url)
+  }
+
+  // // Optional: Redirect root path to dashboard if user is authenticated
+  // if (user && isLandingPage) {
+  //   const url = request.nextUrl.clone()
   //   url.pathname = '/dashboard'
-  //   return NextResponse.redirect(url);
+  //   return NextResponse.redirect(url)
   // }
-
-//   const {
-//   } = await supabase.auth.getUser()
-
-//   if (
-//     !user &&
-//     !request.nextUrl.pathname.startsWith('/login') &&
-//     !request.nextUrl.pathname.startsWith('/auth') &&
-//     !request.nextUrl.pathname.startsWith('/error')
-//   ) {
-//     // no user, potentially respond by redirecting the user to the login page
-//     const url = request.nextUrl.clone()
-//     url.pathname = '/login'
-//     return NextResponse.redirect(url)
-//   }
-
-  // IMPORTANT: You *must* return the supabaseResponse object as it is.
-  // If you're creating a new response object with NextResponse.next() make sure to:
-  // 1. Pass the request in it, like so:
-  //    const myNewResponse = NextResponse.next({ request })
-  // 2. Copy over the cookies, like so:
-  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
-  // 3. Change the myNewResponse object to fit your needs, but avoid changing
-  //    the cookies!
-  // 4. Finally:
-  //    return myNewResponse
-  // If this is not done, you may be causing the browser and server to go out
-  // of sync and terminate the user's session prematurely!
 
   return supabaseResponse
 }
